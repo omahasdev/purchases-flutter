@@ -8,6 +8,7 @@ import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
 import 'internal_paywall_footer_view.dart';
+import 'paywall_theme_mode.dart';
 
 /// View that displays the paywall in footer mode.
 /// Not supported in macOS currently. Only available for original template paywalls. Ignored for V2 Paywalls.
@@ -43,6 +44,7 @@ class PaywallFooterView extends OriginalTemplatePaywallFooterView {
   const PaywallFooterView({
     Key? key,
     Offering? offering,
+    PaywallThemeMode themeMode = PaywallThemeMode.system,
     Function(Package rcPackage)? onPurchaseStarted,
     Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)? onPurchaseCompleted,
     Function()? onPurchaseCancelled,
@@ -54,6 +56,7 @@ class PaywallFooterView extends OriginalTemplatePaywallFooterView {
   }) : super(
       key: key,
       offering: offering,
+      themeMode: themeMode,
       onPurchaseStarted: onPurchaseStarted,
       onPurchaseCompleted: onPurchaseCompleted,
       onPurchaseCancelled: onPurchaseCancelled,
@@ -90,12 +93,17 @@ class PaywallFooterView extends OriginalTemplatePaywallFooterView {
 /// [onDismiss] (Optional) Callback that gets called when the paywall wants to
 /// dismiss. Currently, after a purchase is completed.
 ///
+/// [themeMode] (Optional) Override the system theme for this paywall.
+/// Defaults to [PaywallThemeMode.system] which uses the device's current theme.
+/// Use [PaywallThemeMode.light] or [PaywallThemeMode.dark] to force a specific theme.
+///
 /// [contentCreator] A function that creates the content to be displayed above
 /// the paywall. Make sure you apply the given padding to the bottom of your
 /// content to avoid overlap.
 class OriginalTemplatePaywallFooterView extends StatefulWidget {
 
   final Offering? offering;
+  final PaywallThemeMode themeMode;
   final Function(Package rcPackage)? onPurchaseStarted;
   final Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
   onPurchaseCompleted;
@@ -109,6 +117,7 @@ class OriginalTemplatePaywallFooterView extends StatefulWidget {
   const OriginalTemplatePaywallFooterView({
     Key? key,
     this.offering,
+    this.themeMode = PaywallThemeMode.system,
     this.onPurchaseStarted,
     this.onPurchaseCompleted,
     this.onPurchaseCancelled,
@@ -155,6 +164,7 @@ class _PaywallFooterViewState extends State<OriginalTemplatePaywallFooterView> {
           height: _height,
           child: InternalPaywallFooterView(
             offering: widget.offering,
+            themeMode: widget.themeMode,
             onPurchaseStarted: widget.onPurchaseStarted,
             onPurchaseCompleted: widget.onPurchaseCompleted,
             onPurchaseCancelled: widget.onPurchaseCancelled,

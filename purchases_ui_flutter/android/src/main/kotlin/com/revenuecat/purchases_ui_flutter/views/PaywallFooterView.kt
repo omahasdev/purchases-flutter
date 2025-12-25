@@ -1,6 +1,8 @@
 package com.revenuecat.purchases_ui_flutter.views
 
 import android.content.Context
+import android.content.res.Configuration
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -38,8 +40,28 @@ internal class PaywallFooterView(
         val presentedOfferingContext = (creationParams["presentedOfferingContext"] as? Map<*, *>)?.let {
             MapHelper.mapPresentedOfferingContext(it)
         } ?: offeringIdentifier?.let { PresentedOfferingContext(it) }
+        val themeMode = creationParams["themeMode"] as? Int ?: 0
+
+        val themedContext = when (themeMode) {
+            1 -> { // Light mode
+                val config = Configuration(context.resources.configuration)
+                config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_NO
+                ContextThemeWrapper(context, context.theme).apply {
+                    applyOverrideConfiguration(config)
+                }
+            }
+            2 -> { // Dark mode
+                val config = Configuration(context.resources.configuration)
+                config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_YES
+                ContextThemeWrapper(context, context.theme).apply {
+                    applyOverrideConfiguration(config)
+                }
+            }
+            else -> context // System default
+        }
+
         nativePaywallFooterView = object : NativePaywallFooterView(
-            context,
+            themedContext,
             dismissHandler = { methodChannel.invokeMethod("onDismiss", null) }
         ) {
             public override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

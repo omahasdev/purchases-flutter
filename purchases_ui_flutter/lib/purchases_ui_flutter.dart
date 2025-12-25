@@ -12,6 +12,7 @@ import 'views/customer_center_view_method_handler.dart';
 export 'paywall_result.dart';
 export 'views/customer_center_view.dart';
 export 'views/paywall_footer_view.dart';
+export 'views/paywall_theme_mode.dart';
 export 'views/paywall_view.dart';
 class RevenueCatUI {
   static const _methodChannel = MethodChannel('purchases_ui_flutter');

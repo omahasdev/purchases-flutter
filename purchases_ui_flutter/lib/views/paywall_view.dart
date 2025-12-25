@@ -12,6 +12,7 @@ import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
 import 'paywall_view_method_handler.dart';
+import 'paywall_theme_mode.dart';
 
 /// View that displays the paywall in full screen mode.
 /// Not supported in macOS currently.
@@ -45,9 +46,14 @@ import 'paywall_view_method_handler.dart';
 /// [onDismiss] (Optional) Callback that gets called when the paywall wants to
 /// dismiss. Currently, after a purchase is completed or when the close button
 /// is tapped.
+///
+/// [themeMode] (Optional) Override the system theme for this paywall.
+/// Defaults to [PaywallThemeMode.system] which uses the device's current theme.
+/// Use [PaywallThemeMode.light] or [PaywallThemeMode.dark] to force a specific theme.
 class PaywallView extends StatelessWidget {
   final Offering? offering;
   final bool? displayCloseButton;
+  final PaywallThemeMode themeMode;
   final Function(Package rcPackage)? onPurchaseStarted;
   final Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
       onPurchaseCompleted;
@@ -61,6 +67,7 @@ class PaywallView extends StatelessWidget {
     Key? key,
     this.offering,
     this.displayCloseButton,
+    this.themeMode = PaywallThemeMode.system,
     this.onPurchaseStarted,
     this.onPurchaseCompleted,
     this.onPurchaseCancelled,
@@ -79,6 +86,7 @@ class PaywallView extends StatelessWidget {
       'offeringIdentifier': offering?.identifier,
       'presentedOfferingContext': presentedOfferingContext?.toJson(),
       'displayCloseButton': displayCloseButton,
+      'themeMode': themeMode.nativeValue,
     };
 
     return Platform.isAndroid

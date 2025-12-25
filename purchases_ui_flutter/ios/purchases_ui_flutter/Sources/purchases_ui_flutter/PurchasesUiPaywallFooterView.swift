@@ -63,6 +63,16 @@ class PurchasesUiPaywallFooterView: NSObject, FlutterPlatformView {
                 }
                 paywallFooterViewController.update(with: offeringId, presentedOfferingContext: presentedOfferingContext)
             }
+            if let themeModeValue = args["themeMode"] as? Int {
+                switch themeModeValue {
+                case 1:
+                    paywallFooterViewController.overrideUserInterfaceStyle = .light
+                case 2:
+                    paywallFooterViewController.overrideUserInterfaceStyle = .dark
+                default:
+                    paywallFooterViewController.overrideUserInterfaceStyle = .unspecified
+                }
+            }
         }
         guard let paywallFooterView = paywallFooterViewController.view else {
             print("Error: error getting PaywallFooterView.")
