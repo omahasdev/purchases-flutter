@@ -131,6 +131,16 @@ class PurchasesUiPaywallView: NSObject, FlutterPlatformView {
             if let displayCloseButton = args["displayCloseButton"] as? Bool {
                 paywallViewController.update(with: displayCloseButton)
             }
+            if let themeModeValue = args["themeMode"] as? Int {
+                switch themeModeValue {
+                case 1:
+                    _paywallViewController.overrideUserInterfaceStyle = .light
+                case 2:
+                    _paywallViewController.overrideUserInterfaceStyle = .dark
+                default:
+                    _paywallViewController.overrideUserInterfaceStyle = .unspecified
+                }
+            }
         }
         _paywallViewController = paywallViewController
         _view = PaywallViewWrapper(paywallViewController: paywallViewController)
