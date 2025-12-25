@@ -1,6 +1,8 @@
 package com.revenuecat.purchases_ui_flutter.views
 
 import android.content.Context
+import android.content.res.Configuration
+import android.view.ContextThemeWrapper
 import android.view.View
 import com.revenuecat.purchases.hybridcommon.ui.PaywallListenerWrapper
 import com.revenuecat.purchases_ui_flutter.MapHelper
@@ -35,8 +37,28 @@ internal class PaywallView(
             MapHelper.mapPresentedOfferingContext(it)
         }
         val displayCloseButton = creationParams["displayCloseButton"] as Boolean?
+        val themeMode = creationParams["themeMode"] as? Int ?: 0
+
+        val themedContext = when (themeMode) {
+            1 -> { // Light mode
+                val config = Configuration(context.resources.configuration)
+                config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_NO
+                ContextThemeWrapper(context, context.theme).apply {
+                    applyOverrideConfiguration(config)
+                }
+            }
+            2 -> { // Dark mode
+                val config = Configuration(context.resources.configuration)
+                config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_YES
+                ContextThemeWrapper(context, context.theme).apply {
+                    applyOverrideConfiguration(config)
+                }
+            }
+            else -> context // System default
+        }
+
         nativePaywallView = NativePaywallView(
-            context = context,
+            context = themedContext,
             shouldDisplayDismissButton = displayCloseButton,
             dismissHandler = { methodChannel.invokeMethod("onDismiss", null) }
         )

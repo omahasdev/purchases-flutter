@@ -12,9 +12,11 @@ import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
 import 'paywall_view_method_handler.dart';
+import 'paywall_theme_mode.dart';
 
 class InternalPaywallFooterView extends StatelessWidget {
   final Offering? offering;
+  final PaywallThemeMode themeMode;
   final Function(Package rcPackage)? onPurchaseStarted;
   final Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
   onPurchaseCompleted;
@@ -28,6 +30,7 @@ class InternalPaywallFooterView extends StatelessWidget {
   const InternalPaywallFooterView({
     Key? key,
     this.offering,
+    this.themeMode = PaywallThemeMode.system,
     this.onPurchaseStarted,
     this.onPurchaseCompleted,
     this.onPurchaseCancelled,
@@ -44,6 +47,7 @@ class InternalPaywallFooterView extends StatelessWidget {
   Widget build(BuildContext context) {
     final creationParams = <String, dynamic>{
       'offeringIdentifier': offering?.identifier,
+      'themeMode': themeMode.nativeValue,
     };
 
     return Platform.isAndroid
