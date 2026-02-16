@@ -134,11 +134,11 @@ class PurchasesUiPaywallView: NSObject, FlutterPlatformView {
             if let themeModeValue = args["themeMode"] as? Int {
                 switch themeModeValue {
                 case 1:
-                    _paywallViewController.overrideUserInterfaceStyle = .light
+                    paywallViewController.overrideUserInterfaceStyle = .light
                 case 2:
-                    _paywallViewController.overrideUserInterfaceStyle = .dark
+                    paywallViewController.overrideUserInterfaceStyle = .dark
                 default:
-                    _paywallViewController.overrideUserInterfaceStyle = .unspecified
+                    paywallViewController.overrideUserInterfaceStyle = .unspecified
                 }
             }
         }
