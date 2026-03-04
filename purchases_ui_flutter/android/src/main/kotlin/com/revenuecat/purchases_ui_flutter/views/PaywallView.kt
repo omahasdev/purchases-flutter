@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.view.ContextThemeWrapper
 import android.view.View
 import com.revenuecat.purchases.hybridcommon.ui.PaywallListenerWrapper
+import com.revenuecat.purchases.ui.revenuecatui.CustomVariableValue
 import com.revenuecat.purchases_ui_flutter.MapHelper
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -90,6 +91,14 @@ internal class PaywallView(
                 methodChannel.invokeMethod("onRestoreError", error)
             }
         })
+        // Custom variables must be set before setting the offering to ensure they're applied
+        val customVariables = creationParams["customVariables"] as? Map<String, Any?>
+        if (customVariables != null) {
+            val convertedVariables = customVariables.mapNotNull { (key, value) ->
+                value?.let { key to CustomVariableValue.String(it.toString()) }
+            }.toMap()
+            nativePaywallView.setCustomVariables(convertedVariables)
+        }
         nativePaywallView.setOfferingId(offeringIdentifier, presentedOfferingContext)
     }
 

@@ -11,6 +11,7 @@ import 'package:purchases_flutter/models/package_wrapper.dart';
 import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
+import '../custom_variable_value.dart';
 import 'paywall_view_method_handler.dart';
 import 'paywall_theme_mode.dart';
 
@@ -47,12 +48,17 @@ import 'paywall_theme_mode.dart';
 /// dismiss. Currently, after a purchase is completed or when the close button
 /// is tapped.
 ///
+/// [customVariables] (Optional) A map of custom variable names to their values.
+/// These values can be used for text substitution in paywalls using the
+/// `{{ custom.variable_name }}` syntax.
+///
 /// [themeMode] (Optional) Override the system theme for this paywall.
 /// Defaults to [PaywallThemeMode.system] which uses the device's current theme.
 /// Use [PaywallThemeMode.light] or [PaywallThemeMode.dark] to force a specific theme.
 class PaywallView extends StatelessWidget {
   final Offering? offering;
   final bool? displayCloseButton;
+  final Map<String, CustomVariableValue>? customVariables;
   final PaywallThemeMode themeMode;
   final Function(Package rcPackage)? onPurchaseStarted;
   final Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
@@ -67,6 +73,7 @@ class PaywallView extends StatelessWidget {
     Key? key,
     this.offering,
     this.displayCloseButton,
+    this.customVariables,
     this.themeMode = PaywallThemeMode.system,
     this.onPurchaseStarted,
     this.onPurchaseCompleted,
@@ -86,6 +93,7 @@ class PaywallView extends StatelessWidget {
       'offeringIdentifier': offering?.identifier,
       'presentedOfferingContext': presentedOfferingContext?.toJson(),
       'displayCloseButton': displayCloseButton,
+      'customVariables': convertCustomVariablesToStrings(customVariables),
       'themeMode': themeMode.nativeValue,
     };
 
