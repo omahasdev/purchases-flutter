@@ -12,6 +12,7 @@ import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
 import '../custom_variable_value.dart';
+import '../purchase_logic.dart';
 import 'paywall_view_method_handler.dart';
 import 'paywall_theme_mode.dart';
 
@@ -27,7 +28,7 @@ import 'paywall_theme_mode.dart';
 ///
 /// [onPurchaseStarted] (Optional) Callback that gets called when a purchase
 /// is started.
-/// 
+///
 /// [onPurchaseCancelled] (Optional) Callback that gets called when a purchase
 /// is cancelled.
 ///
@@ -55,14 +56,20 @@ import 'paywall_theme_mode.dart';
 /// [themeMode] (Optional) Override the system theme for this paywall.
 /// Defaults to [PaywallThemeMode.system] which uses the device's current theme.
 /// Use [PaywallThemeMode.light] or [PaywallThemeMode.dark] to force a specific theme.
+///
+/// [purchaseLogic] (Optional) Custom purchase logic to handle purchases and
+/// restores when `purchasesAreCompletedBy` is set to `myApp`. When provided,
+/// the paywall will delegate purchase and restore operations to this
+/// implementation instead of using RevenueCat's default flow.
 class PaywallView extends StatelessWidget {
   final Offering? offering;
   final bool? displayCloseButton;
   final Map<String, CustomVariableValue>? customVariables;
   final PaywallThemeMode themeMode;
+  final PaywallPurchaseLogic? purchaseLogic;
   final Function(Package rcPackage)? onPurchaseStarted;
   final Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
-      onPurchaseCompleted;
+  onPurchaseCompleted;
   final Function()? onPurchaseCancelled;
   final Function(PurchasesError)? onPurchaseError;
   final Function(CustomerInfo customerInfo)? onRestoreCompleted;
@@ -75,6 +82,7 @@ class PaywallView extends StatelessWidget {
     this.displayCloseButton,
     this.customVariables,
     this.themeMode = PaywallThemeMode.system,
+    this.purchaseLogic,
     this.onPurchaseStarted,
     this.onPurchaseCompleted,
     this.onPurchaseCancelled,
@@ -88,13 +96,16 @@ class PaywallView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presentedOfferingContext = offering?.availablePackages.elementAtOrNull(0)?.presentedOfferingContext;
+    final presentedOfferingContext = offering?.availablePackages
+        .elementAtOrNull(0)
+        ?.presentedOfferingContext;
     final creationParams = <String, dynamic>{
       'offeringIdentifier': offering?.identifier,
       'presentedOfferingContext': presentedOfferingContext?.toJson(),
       'displayCloseButton': displayCloseButton,
       'customVariables': convertCustomVariablesToStrings(customVariables),
       'themeMode': themeMode.nativeValue,
+      'hasPurchaseLogic': purchaseLogic != null,
     };
 
     return Platform.isAndroid
@@ -103,44 +114,42 @@ class PaywallView extends StatelessWidget {
   }
 
   UiKitView _buildUiKitView(Map<String, dynamic> creationParams) => UiKitView(
-        viewType: _viewType,
-        layoutDirection: TextDirection.ltr,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: _buildListenerChannel,
-      );
+    viewType: _viewType,
+    layoutDirection: TextDirection.ltr,
+    creationParams: creationParams,
+    creationParamsCodec: const StandardMessageCodec(),
+    onPlatformViewCreated: _buildListenerChannel,
+  );
 
   PlatformViewLink _buildAndroidPlatformViewLink(
     Map<String, dynamic> creationParams,
-  ) =>
-      PlatformViewLink(
-        viewType: _viewType,
-        surfaceFactory: (context, controller) => AndroidViewSurface(
-          controller: controller as AndroidViewController,
-          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
-          hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-        ),
-        onCreatePlatformView: (params) =>
-            PlatformViewsService.initSurfaceAndroidView(
-          id: params.id,
-          viewType: _viewType,
-          layoutDirection: TextDirection.ltr,
-          creationParams: creationParams,
-          creationParamsCodec: const StandardMessageCodec(),
-          onFocus: () {
-            params.onFocusChanged(true);
-          },
-        )
-              ..addOnPlatformViewCreatedListener(
-                params.onPlatformViewCreated,
-              )
-              ..addOnPlatformViewCreatedListener(
-                _buildListenerChannel,
-              )
-              ..create(),
-      );
+  ) => PlatformViewLink(
+    viewType: _viewType,
+    surfaceFactory: (context, controller) => AndroidViewSurface(
+      controller: controller as AndroidViewController,
+      gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+      hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+    ),
+    onCreatePlatformView: (params) =>
+        PlatformViewsService.initSurfaceAndroidView(
+            id: params.id,
+            viewType: _viewType,
+            layoutDirection: TextDirection.ltr,
+            creationParams: creationParams,
+            creationParamsCodec: const StandardMessageCodec(),
+            onFocus: () {
+              params.onFocusChanged(true);
+            },
+          )
+          ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+          ..addOnPlatformViewCreatedListener(_buildListenerChannel)
+          ..create(),
+  );
 
   void _buildListenerChannel(int id) {
+    final methodChannel = MethodChannel(
+      'com.revenuecat.purchasesui/PaywallView/$id',
+    );
     final handler = PaywallViewMethodHandler(
       onPurchaseStarted,
       onPurchaseCompleted,
@@ -149,8 +158,9 @@ class PaywallView extends StatelessWidget {
       onRestoreCompleted,
       onRestoreError,
       onDismiss,
+      purchaseLogic: purchaseLogic,
+      methodChannel: methodChannel,
     );
-    MethodChannel('com.revenuecat.purchasesui/PaywallView/$id')
-          .setMethodCallHandler(handler.handleMethodCall);
+    methodChannel.setMethodCallHandler(handler.handleMethodCall);
   }
 }

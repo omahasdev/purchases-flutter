@@ -46,7 +46,8 @@ class PaywallFooterView extends OriginalTemplatePaywallFooterView {
     Offering? offering,
     PaywallThemeMode themeMode = PaywallThemeMode.system,
     Function(Package rcPackage)? onPurchaseStarted,
-    Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)? onPurchaseCompleted,
+    Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
+    onPurchaseCompleted,
     Function()? onPurchaseCancelled,
     Function(PurchasesError)? onPurchaseError,
     Function(CustomerInfo customerInfo)? onRestoreCompleted,
@@ -101,7 +102,6 @@ class PaywallFooterView extends OriginalTemplatePaywallFooterView {
 /// the paywall. Make sure you apply the given padding to the bottom of your
 /// content to avoid overlap.
 class OriginalTemplatePaywallFooterView extends StatefulWidget {
-
   final Offering? offering;
   final PaywallThemeMode themeMode;
   final Function(Package rcPackage)? onPurchaseStarted;
