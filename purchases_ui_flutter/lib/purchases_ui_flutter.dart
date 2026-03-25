@@ -5,12 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:purchases_flutter/models/customer_info_wrapper.dart';
 import 'package:purchases_flutter/models/offering_wrapper.dart';
 import 'package:purchases_flutter/models/purchases_error.dart';
+import 'package:purchases_flutter/models/store_transaction.dart';
 
 import 'custom_variable_value.dart';
+import 'paywall_presentation_configuration.dart';
 import 'paywall_result.dart';
 import 'views/customer_center_view_method_handler.dart';
 
 export 'custom_variable_value.dart';
+export 'paywall_presentation_configuration.dart';
 export 'paywall_result.dart';
 export 'purchase_logic.dart';
 export 'views/customer_center_view.dart';
@@ -25,17 +28,19 @@ class RevenueCatUI {
   static CustomerCenterRestoreCompleted? _customerCenterOnRestoreCompleted;
   static CustomerCenterRestoreFailed? _customerCenterOnRestoreFailed;
   static CustomerCenterManageSubscriptions?
-  _customerCenterOnShowingManageSubscriptions;
+      _customerCenterOnShowingManageSubscriptions;
   static CustomerCenterRefundRequestStarted?
-  _customerCenterOnRefundRequestStarted;
+      _customerCenterOnRefundRequestStarted;
   static CustomerCenterRefundRequestCompleted?
-  _customerCenterOnRefundRequestCompleted;
+      _customerCenterOnRefundRequestCompleted;
   static CustomerCenterFeedbackSurveyCompleted?
-  _customerCenterOnFeedbackSurveyCompleted;
+      _customerCenterOnFeedbackSurveyCompleted;
   static CustomerCenterManagementOptionSelected?
-  _customerCenterOnManagementOptionSelected;
+      _customerCenterOnManagementOptionSelected;
   static CustomerCenterCustomActionSelected?
-  _customerCenterOnCustomActionSelected;
+      _customerCenterOnCustomActionSelected;
+  static CustomerCenterPromotionalOfferSucceeded?
+      _customerCenterOnPromotionalOfferSucceeded;
   static bool _methodChannelHandlerSet = false;
 
   /// Presents the paywall as an activity on android or a modal in iOS.
@@ -43,10 +48,12 @@ class RevenueCatUI {
   /// @param [offering] If set, will present the paywall associated to the given Offering.
   /// @param [displayCloseButton] Optionally present the paywall with a close button. Only available for original template paywalls. Ignored for V2 Paywalls.
   /// @param [customVariables] A map of custom variable names to their values. These values can be used for text substitution in paywalls using the `{{ custom.variable_name }}` syntax.
+  /// @param [presentationConfiguration] Optional configuration for how the paywall is presented on each platform.
   static Future<PaywallResult> presentPaywall({
     Offering? offering,
     bool displayCloseButton = false,
     Map<String, CustomVariableValue>? customVariables,
+    PaywallPresentationConfiguration? presentationConfiguration,
   }) async {
     final presentedOfferingContext = offering?.availablePackages
         .elementAtOrNull(0)
@@ -55,7 +62,13 @@ class RevenueCatUI {
       'offeringIdentifier': offering?.identifier,
       'presentedOfferingContext': presentedOfferingContext?.toJson(),
       'displayCloseButton': displayCloseButton,
-      'customVariables': convertCustomVariablesToStrings(customVariables),
+      'customVariables': convertCustomVariablesToNative(customVariables),
+      // Only send when fullScreen is explicitly requested; omitting the key
+      // lets the native SDK use its default (sheet). This avoids ambiguity
+      // between "key absent" and "key present with false".
+      if (presentationConfiguration?.ios ==
+          IOSPaywallPresentationStyle.fullScreen)
+        'useFullScreenPresentation': true,
     });
     return _parseStringToResult(result);
   }
@@ -68,11 +81,13 @@ class RevenueCatUI {
   /// @param [offering] If set, will present the paywall associated to the given Offering.
   /// @param [displayCloseButton] Optionally present the paywall with a close button. Only available for original template paywalls. Ignored for V2 Paywalls.
   /// @param [customVariables] A map of custom variable names to their values. These values can be used for text substitution in paywalls using the `{{ custom.variable_name }}` syntax.
+  /// @param [presentationConfiguration] Optional configuration for how the paywall is presented on each platform.
   static Future<PaywallResult> presentPaywallIfNeeded(
     String requiredEntitlementIdentifier, {
     Offering? offering,
     bool displayCloseButton = false,
     Map<String, CustomVariableValue>? customVariables,
+    PaywallPresentationConfiguration? presentationConfiguration,
   }) async {
     final presentedOfferingContext = offering?.availablePackages
         .elementAtOrNull(0)
@@ -82,7 +97,13 @@ class RevenueCatUI {
       'offeringIdentifier': offering?.identifier,
       'presentedOfferingContext': presentedOfferingContext?.toJson(),
       'displayCloseButton': displayCloseButton,
-      'customVariables': convertCustomVariablesToStrings(customVariables),
+      'customVariables': convertCustomVariablesToNative(customVariables),
+      // Only send when fullScreen is explicitly requested; omitting the key
+      // lets the native SDK use its default (sheet). This avoids ambiguity
+      // between "key absent" and "key present with false".
+      if (presentationConfiguration?.ios ==
+          IOSPaywallPresentationStyle.fullScreen)
+        'useFullScreenPresentation': true,
     });
     return _parseStringToResult(result);
   }
@@ -101,10 +122,10 @@ class RevenueCatUI {
     CustomerCenterFeedbackSurveyCompleted? onFeedbackSurveyCompleted,
     CustomerCenterManagementOptionSelected? onManagementOptionSelected,
     CustomerCenterCustomActionSelected? onCustomActionSelected,
+    CustomerCenterPromotionalOfferSucceeded? onPromotionalOfferSucceeded,
   }) async {
     _setMethodChannelHandlerIfNeeded();
-    final hasCallbacks =
-        onRestoreStarted != null ||
+    final hasCallbacks = onRestoreStarted != null ||
         onRestoreCompleted != null ||
         onRestoreFailed != null ||
         onShowingManageSubscriptions != null ||
@@ -112,7 +133,8 @@ class RevenueCatUI {
         onRefundRequestCompleted != null ||
         onFeedbackSurveyCompleted != null ||
         onManagementOptionSelected != null ||
-        onCustomActionSelected != null;
+        onCustomActionSelected != null ||
+        onPromotionalOfferSucceeded != null;
 
     await _clearCustomerCenterCallbacks();
 
@@ -127,6 +149,7 @@ class RevenueCatUI {
         onFeedbackSurveyCompleted: onFeedbackSurveyCompleted,
         onManagementOptionSelected: onManagementOptionSelected,
         onCustomActionSelected: onCustomActionSelected,
+        onPromotionalOfferSucceeded: onPromotionalOfferSucceeded,
       );
     }
     await _methodChannel.invokeMethod('presentCustomerCenter');
@@ -174,6 +197,7 @@ class RevenueCatUI {
     CustomerCenterFeedbackSurveyCompleted? onFeedbackSurveyCompleted,
     CustomerCenterManagementOptionSelected? onManagementOptionSelected,
     CustomerCenterCustomActionSelected? onCustomActionSelected,
+    CustomerCenterPromotionalOfferSucceeded? onPromotionalOfferSucceeded,
   }) async {
     _setMethodChannelHandlerIfNeeded();
     _customerCenterOnRestoreStarted = onRestoreStarted;
@@ -185,6 +209,7 @@ class RevenueCatUI {
     _customerCenterOnFeedbackSurveyCompleted = onFeedbackSurveyCompleted;
     _customerCenterOnManagementOptionSelected = onManagementOptionSelected;
     _customerCenterOnCustomActionSelected = onCustomActionSelected;
+    _customerCenterOnPromotionalOfferSucceeded = onPromotionalOfferSucceeded;
     await _methodChannel.invokeMethod('setCustomerCenterCallbacks');
   }
 
@@ -199,6 +224,7 @@ class RevenueCatUI {
     _customerCenterOnFeedbackSurveyCompleted = null;
     _customerCenterOnManagementOptionSelected = null;
     _customerCenterOnCustomActionSelected = null;
+    _customerCenterOnPromotionalOfferSucceeded = null;
     await _methodChannel.invokeMethod('clearCustomerCenterCallbacks');
   }
 
@@ -372,6 +398,44 @@ class RevenueCatUI {
           actionIdentifier,
           purchaseIdentifier as String?,
         );
+        break;
+      case 'onPromotionalOfferSucceeded':
+        final rawArguments = call.arguments;
+        if (rawArguments is! Map) {
+          debugPrint(
+            'RevenueCatUI: Error - onPromotionalOfferSucceeded called with invalid arguments: $rawArguments',
+          );
+          return;
+        }
+        final arguments = Map<String, dynamic>.from(rawArguments);
+        final customerInfoMap = arguments['customerInfo'];
+        final transactionMap = arguments['transaction'];
+        final offerId = arguments['offerId'];
+        if (customerInfoMap is! Map ||
+            transactionMap is! Map ||
+            offerId is! String) {
+          debugPrint(
+            'RevenueCatUI: Error - onPromotionalOfferSucceeded called with missing or invalid data',
+          );
+          return;
+        }
+        try {
+          final customerInfo = CustomerInfo.fromJson(
+            Map<String, dynamic>.from(customerInfoMap),
+          );
+          final transaction = StoreTransaction.fromJson(
+            Map<String, dynamic>.from(transactionMap),
+          );
+          _customerCenterOnPromotionalOfferSucceeded?.call(
+            customerInfo,
+            transaction,
+            offerId,
+          );
+        } catch (e) {
+          debugPrint(
+            'RevenueCatUI: Error parsing onPromotionalOfferSucceeded data: $e',
+          );
+        }
         break;
     }
   }

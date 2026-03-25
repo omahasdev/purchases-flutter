@@ -7,6 +7,8 @@ import 'package:purchases_flutter/models/package_wrapper.dart';
 import 'package:purchases_flutter/models/presented_offering_context_wrapper.dart';
 import 'package:purchases_flutter/models/presented_offering_targeting_context_wrapper.dart';
 import 'package:purchases_flutter/models/store_product_wrapper.dart';
+import 'package:purchases_flutter/models/customer_info_wrapper.dart';
+import 'package:purchases_flutter/models/store_transaction.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:purchases_ui_flutter/views/customer_center_view_method_handler.dart';
 
@@ -33,9 +35,9 @@ void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-          log.add(call);
-          return response;
-        });
+      log.add(call);
+      return response;
+    });
   });
 
   tearDown(() {
@@ -54,10 +56,10 @@ void main() {
     final completer = Completer<void>();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .handlePlatformMessage(
-          'purchases_ui_flutter',
-          data,
-          (_) => completer.complete(),
-        );
+      'purchases_ui_flutter',
+      data,
+      (_) => completer.complete(),
+    );
     await completer.future;
     await Future<void>.delayed(Duration.zero);
   }
@@ -196,7 +198,8 @@ void main() {
     await RevenueCatUI.presentPaywall(
       customVariables: {
         'player_name': CustomVariableValue.string('John'),
-        'level': CustomVariableValue.string('5'),
+        'level': CustomVariableValue.number(5),
+        'is_premium': CustomVariableValue.boolean(true),
       },
     );
     expect(log, <Matcher>[
@@ -206,7 +209,11 @@ void main() {
           'offeringIdentifier': null,
           'presentedOfferingContext': null,
           'displayCloseButton': false,
-          'customVariables': {'player_name': 'John', 'level': '5'},
+          'customVariables': {
+            'player_name': 'John',
+            'level': 5.0,
+            'is_premium': true,
+          },
         },
       ),
     ]);
@@ -216,7 +223,10 @@ void main() {
     response = 'NOT_PRESENTED';
     await RevenueCatUI.presentPaywallIfNeeded(
       'entitlement',
-      customVariables: {'player_name': CustomVariableValue.string('John')},
+      customVariables: {
+        'player_name': CustomVariableValue.string('John'),
+        'level': CustomVariableValue.number(42),
+      },
     );
     expect(log, <Matcher>[
       isMethodCall(
@@ -226,7 +236,119 @@ void main() {
           'offeringIdentifier': null,
           'presentedOfferingContext': null,
           'displayCloseButton': false,
-          'customVariables': {'player_name': 'John'},
+          'customVariables': {'player_name': 'John', 'level': 42.0},
+        },
+      ),
+    ]);
+  });
+
+  test(
+      'presentPaywall with android-only presentation configuration does not send useFullScreenPresentation',
+      () async {
+    response = 'NOT_PRESENTED';
+    await RevenueCatUI.presentPaywall(
+      presentationConfiguration: const PaywallPresentationConfiguration(
+        android: AndroidPaywallPresentationStyle.fullScreen,
+      ),
+    );
+    expect(log, <Matcher>[
+      isMethodCall(
+        'presentPaywall',
+        arguments: {
+          'offeringIdentifier': null,
+          'presentedOfferingContext': null,
+          'displayCloseButton': false,
+          'customVariables': null,
+        },
+      ),
+    ]);
+  });
+
+  test('presentPaywallIfNeeded with sheet presentation configuration',
+      () async {
+    response = 'NOT_PRESENTED';
+    await RevenueCatUI.presentPaywallIfNeeded(
+      'entitlement',
+      presentationConfiguration: const PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.sheet,
+      ),
+    );
+    expect(log, <Matcher>[
+      isMethodCall(
+        'presentPaywallIfNeeded',
+        arguments: {
+          'requiredEntitlementIdentifier': 'entitlement',
+          'offeringIdentifier': null,
+          'presentedOfferingContext': null,
+          'displayCloseButton': false,
+          'customVariables': null,
+          // sheet is the native default; key is omitted rather than sent as false
+        },
+      ),
+    ]);
+  });
+
+  test('presentPaywall with full screen presentation configuration', () async {
+    response = 'NOT_PRESENTED';
+    await RevenueCatUI.presentPaywall(
+      presentationConfiguration: const PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.fullScreen,
+      ),
+    );
+    expect(log, <Matcher>[
+      isMethodCall(
+        'presentPaywall',
+        arguments: {
+          'offeringIdentifier': null,
+          'presentedOfferingContext': null,
+          'displayCloseButton': false,
+          'customVariables': null,
+          'useFullScreenPresentation': true,
+        },
+      ),
+    ]);
+  });
+
+  test('presentPaywall with sheet presentation configuration', () async {
+    response = 'NOT_PRESENTED';
+    await RevenueCatUI.presentPaywall(
+      presentationConfiguration: const PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.sheet,
+      ),
+    );
+    expect(log, <Matcher>[
+      isMethodCall(
+        'presentPaywall',
+        arguments: {
+          'offeringIdentifier': null,
+          'presentedOfferingContext': null,
+          'displayCloseButton': false,
+          'customVariables': null,
+          // sheet is the native default; key is omitted rather than sent as false
+        },
+      ),
+    ]);
+  });
+
+  test('presentPaywallIfNeeded with full screen presentation configuration',
+      () async {
+    response = 'NOT_PRESENTED';
+    await RevenueCatUI.presentPaywallIfNeeded(
+      'entitlement',
+      presentationConfiguration: const PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.fullScreen,
+      ),
+    );
+    expect(log, <Matcher>[
+      isMethodCall(
+        'presentPaywallIfNeeded',
+        arguments: {
+          'requiredEntitlementIdentifier': 'entitlement',
+          'offeringIdentifier': null,
+          'presentedOfferingContext': null,
+          'displayCloseButton': false,
+          'customVariables': null,
+          'useFullScreenPresentation': true,
         },
       ),
     ]);
@@ -315,8 +437,7 @@ void main() {
 
       // Test data extraction logic that should match what's in _handleCustomerCenterMethodCall
       final data = mockCallbackData;
-      final productIdentifier =
-          data['productId'] as String? ??
+      final productIdentifier = data['productId'] as String? ??
           ''; // Should use 'productId' not 'productIdentifier'
       final status = data['status'] as String? ?? '';
 
@@ -658,5 +779,139 @@ void main() {
         expect(callbackCalled, true);
       },
     );
+
+    test('onPromotionalOfferSucceeded fires callback with data', () async {
+      CustomerInfo? receivedCustomerInfo;
+      StoreTransaction? receivedTransaction;
+      String? receivedOfferId;
+
+      await RevenueCatUI.presentCustomerCenter(
+        onPromotionalOfferSucceeded: (customerInfo, transaction, offerId) {
+          receivedCustomerInfo = customerInfo;
+          receivedTransaction = transaction;
+          receivedOfferId = offerId;
+        },
+      );
+
+      log.clear();
+
+      await invokeCustomerCenterMethod('onPromotionalOfferSucceeded', {
+        'customerInfo': {
+          'originalAppUserId': 'test_user',
+          'entitlements': {
+            'all': {},
+            'active': {},
+            'verification': 'NOT_REQUESTED',
+          },
+          'activeSubscriptions': [],
+          'latestExpirationDate': null,
+          'allExpirationDates': {},
+          'allPurchasedProductIdentifiers': [],
+          'firstSeen': '2024-01-01T00:00:00Z',
+          'requestDate': '2024-01-01T00:00:00Z',
+          'allPurchaseDates': {},
+          'originalApplicationVersion': null,
+          'nonSubscriptionTransactions': [],
+        },
+        'transaction': {
+          'transactionIdentifier': 'txn_123',
+          'productIdentifier': 'com.test.product',
+          'purchaseDate': '2024-01-01T00:00:00Z',
+        },
+        'offerId': 'promo_offer_1',
+      });
+      expect(receivedCustomerInfo, isNotNull);
+      expect(receivedTransaction, isNotNull);
+      expect(receivedTransaction!.transactionIdentifier, 'txn_123');
+      expect(receivedTransaction!.productIdentifier, 'com.test.product');
+      expect(receivedOfferId, 'promo_offer_1');
+    });
+  });
+
+  group('PaywallPresentationConfiguration', () {
+    test('fullScreen static has correct values', () {
+      expect(
+        PaywallPresentationConfiguration.fullScreen.ios,
+        IOSPaywallPresentationStyle.fullScreen,
+      );
+      expect(
+        PaywallPresentationConfiguration.fullScreen.android,
+        AndroidPaywallPresentationStyle.fullScreen,
+      );
+    });
+
+    test('defaultConfiguration static has correct values', () {
+      expect(
+        PaywallPresentationConfiguration.defaultConfiguration.ios,
+        IOSPaywallPresentationStyle.sheet,
+      );
+      expect(
+        PaywallPresentationConfiguration.defaultConfiguration.android,
+        AndroidPaywallPresentationStyle.fullScreen,
+      );
+    });
+
+    test('equality', () {
+      const a = PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.fullScreen,
+        android: AndroidPaywallPresentationStyle.fullScreen,
+      );
+      const b = PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.fullScreen,
+        android: AndroidPaywallPresentationStyle.fullScreen,
+      );
+      const c = PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.sheet,
+      );
+
+      expect(a, equals(b));
+      expect(a, isNot(equals(c)));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('toString', () {
+      const config = PaywallPresentationConfiguration(
+        ios: IOSPaywallPresentationStyle.fullScreen,
+        android: AndroidPaywallPresentationStyle.fullScreen,
+      );
+      expect(
+        config.toString(),
+        'PaywallPresentationConfiguration(ios: fullScreen, android: fullScreen)',
+      );
+    });
+  });
+
+  group('IOSPaywallPresentationStyle', () {
+    test('equality', () {
+      expect(
+        IOSPaywallPresentationStyle.fullScreen,
+        equals(IOSPaywallPresentationStyle.fullScreen),
+      );
+      expect(
+        IOSPaywallPresentationStyle.fullScreen,
+        isNot(equals(IOSPaywallPresentationStyle.sheet)),
+      );
+    });
+
+    test('toString', () {
+      expect(IOSPaywallPresentationStyle.fullScreen.toString(), 'fullScreen');
+      expect(IOSPaywallPresentationStyle.sheet.toString(), 'sheet');
+    });
+  });
+
+  group('AndroidPaywallPresentationStyle', () {
+    test('equality', () {
+      expect(
+        AndroidPaywallPresentationStyle.fullScreen,
+        equals(AndroidPaywallPresentationStyle.fullScreen),
+      );
+    });
+
+    test('toString', () {
+      expect(
+        AndroidPaywallPresentationStyle.fullScreen.toString(),
+        'fullScreen',
+      );
+    });
   });
 }

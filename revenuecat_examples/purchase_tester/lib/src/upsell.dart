@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -13,6 +14,7 @@ import 'custom_variables_editor.dart';
 import 'customer_center_view_screen.dart';
 import 'initial.dart';
 import 'paywall.dart';
+import 'custom_paywall_impression_testing_screen.dart';
 import 'winback_testing_screen.dart';
 import 'virtual_currency_testing_screen.dart';
 
@@ -76,6 +78,42 @@ class _UpsellScreenState extends State<UpsellScreen> {
     setState(() {
       _offerings = offerings;
     });
+  }
+
+  Future<PaywallPresentationConfiguration?> _choosePresentationConfiguration(
+      BuildContext context) {
+    return showCupertinoModalPopup<PaywallPresentationConfiguration>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Presentation Style'),
+        message: const Text('How should the paywall be presented on iOS?'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              context,
+              const PaywallPresentationConfiguration(
+                ios: IOSPaywallPresentationStyle.sheet,
+              ),
+            ),
+            child: const Text('Sheet (default)'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              context,
+              const PaywallPresentationConfiguration(
+                ios: IOSPaywallPresentationStyle.fullScreen,
+              ),
+            ),
+            child: const Text('Full Screen'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          isDestructiveAction: false,
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
   }
 
   void _openCustomVariablesEditor() {
@@ -177,6 +215,19 @@ class _UpsellScreenState extends State<UpsellScreen> {
                 padding: const EdgeInsets.all(8.0),
                 child: Column(children: [
                   const Text("Purchase Methods"),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CustomPaywallImpressionTestingScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text("Custom Paywall Impression Testing"),
+                  ),
+                  const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: () async {
                       final offerings =
@@ -360,9 +411,12 @@ class _UpsellScreenState extends State<UpsellScreen> {
                   const Text("Paywalls"),
                   ElevatedButton(
                     onPressed: () async {
+                      final config = await _choosePresentationConfiguration(context);
+                      if (config == null) return;
                       final paywallResult = await RevenueCatUI.presentPaywall(
                         offering: offering,
                         customVariables: _getCustomVariablesForPaywall(),
+                        presentationConfiguration: config,
                       );
                       log('Paywall result: $paywallResult');
                     },
@@ -370,11 +424,14 @@ class _UpsellScreenState extends State<UpsellScreen> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
+                      final config = await _choosePresentationConfiguration(context);
+                      if (config == null) return;
                       final paywallResult =
                           await RevenueCatUI.presentPaywallIfNeeded(
                         entitlementKey,
                         offering: offering,
                         customVariables: _getCustomVariablesForPaywall(),
+                        presentationConfiguration: config,
                       );
                       log('Paywall result: $paywallResult');
                     },

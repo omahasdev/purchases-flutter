@@ -36,67 +36,8 @@ class PurchasesUiPaywallViewFactory: NSObject, FlutterPlatformViewFactory {
 }
 
 @available(iOS 15.0, *)
-class PaywallViewWrapper: UIView {
-    private var paywallViewController: PaywallViewController
-    private var addedToHierarchy = false
-
-    init(paywallViewController: PaywallViewController) {
-        self.paywallViewController = paywallViewController
-        super.init(frame: paywallViewController.view.bounds)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-
-        // Need to wait for this view to be in the hierarchy to look for the parent UIVC.
-        // This is required to add a SwiftUI `UIHostingController` to the hierarchy in a way that allows
-        // UIKit to read properties from the environment, like traits and safe area.
-        // Not doing this leads to the view not respecting the safe area.
-        if !addedToHierarchy {
-            if let parentController = self.parentViewController {
-                paywallViewController.view.translatesAutoresizingMaskIntoConstraints = false
-                parentController.addChild(paywallViewController)
-                addSubview(paywallViewController.view)
-                paywallViewController.didMove(toParent: parentController)
-
-                NSLayoutConstraint.activate([
-                    paywallViewController.view.topAnchor.constraint(equalTo: topAnchor),
-                    paywallViewController.view.bottomAnchor.constraint(equalTo: bottomAnchor),
-                    paywallViewController.view.leadingAnchor.constraint(equalTo: leadingAnchor),
-                    paywallViewController.view.trailingAnchor.constraint(equalTo: trailingAnchor)
-                ])
-
-                addedToHierarchy = true
-            }
-        }
-    }
-
-    override func removeFromSuperview() {
-        cleanupViewControllerHierarchy()
-        super.removeFromSuperview()
-    }
-
-    deinit {
-        // Ensure cleanup happens even if removeFromSuperview wasn't called
-        cleanupViewControllerHierarchy()
-    }
-
-    private func cleanupViewControllerHierarchy() {
-        guard addedToHierarchy else { return }
-        paywallViewController.willMove(toParent: nil)
-        paywallViewController.view.removeFromSuperview()
-        paywallViewController.removeFromParent()
-        addedToHierarchy = false
-    }
-}
-
-@available(iOS 15.0, *)
 class PurchasesUiPaywallView: NSObject, FlutterPlatformView {
-    private var _view: PaywallViewWrapper
+    private var _view: ViewControllerWrapper<PaywallViewController>
     private var _paywallProxy: PaywallProxy?
     private var _methodChannel: FlutterMethodChannel
     private var _paywallViewController: PaywallViewController
@@ -135,15 +76,10 @@ class PurchasesUiPaywallView: NSObject, FlutterPlatformView {
         if let presentedOfferingContextMap = argsDictionary?["presentedOfferingContext"] as? [String: Any] {
             params.presentedOfferingContext = presentedOfferingContextMap
         }
-        let paywallViewController = paywallProxy.createPaywallView(params: params)
-        // Custom variables must be set before any other updates that might initialize the hosting controller
         if let customVariables = argsDictionary?["customVariables"] as? [String: Any] {
-            customVariables
-                .compactMapValues { $0 as? String }
-                .forEach { key, value in
-                    paywallViewController.setCustomVariable(value, forKey: key)
-                }
+            params.customVariables = customVariables.compactMapValues { $0 }
         }
+        let paywallViewController = paywallProxy.createPaywallView(params: params)
         if let displayCloseButton = argsDictionary?["displayCloseButton"] as? Bool {
             paywallViewController.update(with: displayCloseButton)
         }
@@ -158,7 +94,10 @@ class PurchasesUiPaywallView: NSObject, FlutterPlatformView {
             }
         }
         _paywallViewController = paywallViewController
-        _view = PaywallViewWrapper(paywallViewController: paywallViewController)
+        _view = ViewControllerWrapper(
+            viewController: paywallViewController,
+            usesSafeAreaLayoutGuide: false
+        )
 
         super.init()
         _paywallProxy?.delegate = self
