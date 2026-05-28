@@ -63,7 +63,7 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private static final String PLATFORM_NAME = "flutter";
-    private static final String PLUGIN_VERSION = "10.1.1";
+    private static final String PLUGIN_VERSION = "10.2.0";
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
@@ -386,6 +386,21 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
                 break;
             case "trackCustomPaywallImpression":
                 trackCustomPaywallImpression(call.arguments(), result);
+                break;
+            case "trackAdDisplayed":
+                trackAdDisplayed(call.arguments(), result);
+                break;
+            case "trackAdOpened":
+                trackAdOpened(call.arguments(), result);
+                break;
+            case "trackAdLoaded":
+                trackAdLoaded(call.arguments(), result);
+                break;
+            case "trackAdRevenue":
+                trackAdRevenue(call.arguments(), result);
+                break;
+            case "trackAdFailedToLoad":
+                trackAdFailedToLoad(call.arguments(), result);
                 break;
             default:
                 result.notImplemented();
@@ -875,6 +890,31 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
             }
         }
         CommonKt.trackCustomPaywallImpression(data);
+        result.success(null);
+    }
+
+    private void trackAdDisplayed(Map<String, Object> arguments, final Result result) {
+        CommonKt.trackAdDisplayed(arguments);
+        result.success(null);
+    }
+
+    private void trackAdOpened(Map<String, Object> arguments, final Result result) {
+        CommonKt.trackAdOpened(arguments);
+        result.success(null);
+    }
+
+    private void trackAdLoaded(Map<String, Object> arguments, final Result result) {
+        CommonKt.trackAdLoaded(arguments);
+        result.success(null);
+    }
+
+    private void trackAdRevenue(Map<String, Object> arguments, final Result result) {
+        CommonKt.trackAdRevenue(arguments);
+        result.success(null);
+    }
+
+    private void trackAdFailedToLoad(Map<String, Object> arguments, final Result result) {
+        CommonKt.trackAdFailedToLoad(arguments);
         result.success(null);
     }
 
