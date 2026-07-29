@@ -292,6 +292,10 @@ automaticDeviceIdentifierCollectionEnabled:automaticDeviceIdentifierCollectionEn
         [self trackAdLoaded:arguments result:result];
     } else if ([@"trackAdFailedToLoad" isEqualToString:call.method]) {
         [self trackAdFailedToLoad:arguments result:result];
+    } else if ([@"generateRewardVerificationToken" isEqualToString:call.method]) {
+        [self generateRewardVerificationToken:arguments result:result];
+    } else if ([@"pollRewardVerification" isEqualToString:call.method]) {
+        [self pollRewardVerification:arguments result:result];
     } else {
         result(FlutterMethodNotImplemented);
     }
@@ -779,6 +783,15 @@ signedDiscountTimestamp:(nullable NSString *)discountTimestamp
     result(nil);
 }
 
+- (void)generateRewardVerificationToken:(NSDictionary *)arguments result:(FlutterResult)result {
+    result([RCCommonFunctionality generateRewardVerificationTokenWithImpressionId:arguments[@"impressionId"]]);
+}
+
+- (void)pollRewardVerification:(NSDictionary *)arguments result:(FlutterResult)result {
+    [RCCommonFunctionality pollRewardVerificationWithClientTransactionId:arguments[@"clientTransactionId"]
+                                                             completion:[self getResponseCompletionBlock:result]];
+}
+
 - (void)trackCustomPaywallImpression:(NSDictionary *)arguments result:(FlutterResult)result {
     if (@available(iOS 15.0, tvOS 15.0, macOS 12.0, watchOS 8.0, *)) {
         [RCCommonFunctionality trackCustomPaywallImpression:[arguments mappingNSNullToNil]];
@@ -896,7 +909,7 @@ readyForPromotedProduct:(RCStoreProduct *)product
 }
 
 - (NSString *)platformFlavorVersion {
-    return @"10.4.3";
+    return @"10.6.0";
 }
 
 - (NSError *)createUnsupportedErrorWithDescription:(NSString *)description {

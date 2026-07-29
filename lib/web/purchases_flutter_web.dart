@@ -13,7 +13,7 @@ class PurchasesFlutterPlugin {
   static final _unknownErrorCode = '${PurchasesErrorCode.unknownError.index}';
   static final _configurationErrorCode = '${PurchasesErrorCode.configurationError.index}';
   static const _platformName = 'flutter';
-  static const _pluginVersion = '10.4.3';
+  static const _pluginVersion = '10.6.0';
 
   // Path to the vendored RevenueCat web SDK (purchases-js-hybrid-mappings UMD
   // bundle), served same-origin from the app's assets.
@@ -177,6 +177,8 @@ class PurchasesFlutterPlugin {
         case 'purchaseProductWithWinBackOffer':
         case 'getEligibleWinBackOffersForProduct':
         case 'redeemWebPurchase':
+        case 'generateRewardVerificationToken':
+        case 'pollRewardVerification':
           throw UnsupportedPlatformException();
 
         default:

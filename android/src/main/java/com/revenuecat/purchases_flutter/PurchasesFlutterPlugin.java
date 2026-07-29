@@ -63,7 +63,7 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private static final String PLATFORM_NAME = "flutter";
-    private static final String PLUGIN_VERSION = "10.4.3";
+    private static final String PLUGIN_VERSION = "10.6.0";
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
@@ -406,6 +406,12 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
                 break;
             case "trackAdFailedToLoad":
                 trackAdFailedToLoad(call.arguments(), result);
+                break;
+            case "generateRewardVerificationToken":
+                generateRewardVerificationToken(call.arguments(), result);
+                break;
+            case "pollRewardVerification":
+                pollRewardVerification(call.arguments(), result);
                 break;
             default:
                 result.notImplemented();
@@ -949,6 +955,14 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
     private void trackAdFailedToLoad(Map<String, Object> arguments, final Result result) {
         CommonKt.trackAdFailedToLoad(arguments);
         result.success(null);
+    }
+
+    private void generateRewardVerificationToken(Map<String, Object> arguments, final Result result) {
+        result.success(CommonKt.generateRewardVerificationToken((String) arguments.get("impressionId")));
+    }
+
+    private void pollRewardVerification(Map<String, Object> arguments, final Result result) {
+        CommonKt.pollRewardVerification((String) arguments.get("clientTransactionId"), getOnResult(result));
     }
 
     private void runOnUiThread(Runnable runnable) {
