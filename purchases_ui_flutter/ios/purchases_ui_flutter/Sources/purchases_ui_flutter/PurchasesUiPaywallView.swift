@@ -174,4 +174,12 @@ extension PurchasesUiPaywallView: PaywallViewControllerDelegateWrapper {
     func paywallViewControllerRequestedDismissal(_ controller: PaywallViewController) {
         _methodChannel.invokeMethod("onDismiss", arguments: nil)
     }
+
+    func paywallViewControllerDidOpenWebCheckout(_ controller: PaywallViewController) {
+        _methodChannel.invokeMethod("onWebCheckoutOpened", arguments: nil)
+    }
+
+    func paywallViewController(_ controller: PaywallViewController, didOpenURL url: String) {
+        _methodChannel.invokeMethod("onUrlOpened", arguments: ["url": url])
+    }
 }
