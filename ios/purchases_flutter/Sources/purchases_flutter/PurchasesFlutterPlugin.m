@@ -187,6 +187,9 @@ automaticDeviceIdentifierCollectionEnabled:automaticDeviceIdentifierCollectionEn
     }else if ([@"setOnesignalID" isEqualToString:call.method]) {
         NSString *onesignalID = arguments[@"onesignalID"];
         [self setOnesignalID:onesignalID result:result];
+    } else if ([@"setOnesignalUserID" isEqualToString:call.method]) {
+        NSString *onesignalUserID = arguments[@"onesignalUserID"];
+        [self setOnesignalUserID:onesignalUserID result:result];
     } else if ([@"setAirshipChannelID" isEqualToString:call.method]) {
         NSString *airshipChannelID = arguments[@"airshipChannelID"];
         [self setAirshipChannelID:airshipChannelID result:result];
@@ -585,6 +588,11 @@ signedDiscountTimestamp:(nullable NSString *)discountTimestamp
     result(nil);
 }
 
+- (void)setOnesignalUserID:(nullable NSString *)onesignalUserID result:(FlutterResult)result {
+    [RCCommonFunctionality setOnesignalUserID:onesignalUserID];
+    result(nil);
+}
+
 - (void)setAirshipChannelID:(nullable NSString *)airshipChannelID result:(FlutterResult)result {
     [RCCommonFunctionality setAirshipChannelID:airshipChannelID];
     result(nil);
@@ -901,7 +909,7 @@ readyForPromotedProduct:(RCStoreProduct *)product
 }
 
 - (NSString *)platformFlavorVersion {
-    return @"10.7.0";
+    return @"10.8.0";
 }
 
 - (NSError *)createUnsupportedErrorWithDescription:(NSString *)description {

@@ -63,7 +63,7 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private static final String PLATFORM_NAME = "flutter";
-    private static final String PLUGIN_VERSION = "10.7.0";
+    private static final String PLUGIN_VERSION = "10.8.0";
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
@@ -303,6 +303,10 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
             case "setOnesignalID":
                 String onesignalID = call.argument("onesignalID");
                 setOnesignalID(onesignalID, result);
+                break;
+            case "setOnesignalUserID":
+                String onesignalUserID = call.argument("onesignalUserID");
+                setOnesignalUserID(onesignalUserID, result);
                 break;
             case "setAirshipChannelID":
                 String airshipChannelID = call.argument("airshipChannelID");
@@ -751,6 +755,11 @@ public class PurchasesFlutterPlugin implements FlutterPlugin, MethodCallHandler,
 
     private void setOnesignalID(String onesignalID, final Result result) {
         SubscriberAttributesKt.setOnesignalID(onesignalID);
+        result.success(null);
+    }
+
+    private void setOnesignalUserID(String onesignalUserID, final Result result) {
+        SubscriberAttributesKt.setOnesignalUserID(onesignalUserID);
         result.success(null);
     }
 
