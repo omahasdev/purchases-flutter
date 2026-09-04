@@ -15,43 +15,90 @@ jobs:
       issues: write
 
     steps:
-      - name: Sync fork via API
-        id: sync
-        uses: actions/github-script@v7
+      - name: Check out fork
+        uses: actions/checkout@v4
         with:
-          # GITHUB_TOKEN cannot write .github/workflows/** — the `workflows` scope
-          # does not exist in the `permissions:` block, only on PATs/GitHub Apps.
-          # Add a SYNC_TOKEN secret (fine-grained PAT, Contents + Workflows: write)
-          # to make upstream workflow changes sync automatically.
-          github-token: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            try {
-              const result = await github.rest.repos.mergeUpstream({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                branch: 'main'
-              });
-              core.setOutput('reason', result.data.merge_type || 'up-to-date');
-              core.info(`Sync result: ${result.data.message}`);
-            } catch (error) {
-              const message = error.message || 'Unknown error';
-              const isWorkflowScope = /without .?workflows.? permission/i.test(message);
+          # Full history: the merge below needs a merge base with upstream.
+          fetch-depth: 0
 
-              let reason;
-              if (isWorkflowScope) {
-                reason = 'workflow-scope';
-              } else if (error.status === 409) {
-                reason = 'conflict';
-              } else if (error.status === 422) {
-                reason = 'unmergeable';
-              } else {
-                throw error;
-              }
+      - name: Merge upstream
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The bot identity Actions attributes GITHUB_TOKEN commits to.
+          COMMIT_NAME: 'github-actions[bot]'
+          COMMIT_EMAIL: '41898282+github-actions[bot]@users.noreply.github.com'
+          WORKFLOW_DIR: .github/workflows
+        run: |
+          set -euo pipefail
 
-              core.setOutput('reason', reason);
-              core.setOutput('error_message', message);
-              core.setFailed(`Sync failed (HTTP ${error.status}, ${reason}): ${message}`);
-            }
+          fail() {
+            {
+              echo "reason=$1"
+              echo "error_message<<SYNC_REPORT_EOF"
+              echo "$2"
+              echo "SYNC_REPORT_EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+
+          parent=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.parent | "\(.clone_url) \(.default_branch)"')
+          read -r upstream_url upstream_branch <<< "$parent"
+          echo "Upstream: $upstream_url ($upstream_branch)"
+
+          git config user.name "$COMMIT_NAME"
+          git config user.email "$COMMIT_EMAIL"
+          git remote add upstream "$upstream_url"
+          git fetch --no-tags upstream "$upstream_branch"
+
+          pre=$(git rev-parse HEAD)
+
+          if git merge-base --is-ancestor FETCH_HEAD "$pre"; then
+            echo 'reason=up-to-date' >> "$GITHUB_OUTPUT"
+            echo 'Already up to date with upstream.'
+            exit 0
+          fi
+
+          if ! merge_log=$(git merge --no-commit --no-ff FETCH_HEAD 2>&1); then
+            echo "$merge_log"
+            if [ ! -f .git/MERGE_HEAD ]; then
+              fail merge-failed "$merge_log"
+            fi
+            # Conflicts under WORKFLOW_DIR are expected and self-resolving: that
+            # directory is overwritten wholesale in the next step.
+            blocking=$(git diff --name-only --diff-filter=U | grep -v "^$WORKFLOW_DIR/" || true)
+            if [ -n "$blocking" ]; then
+              git merge --abort
+              fail conflict "$blocking"
+            fi
+          fi
+
+          # GitHub refuses a GITHUB_TOKEN push that creates or updates any file under
+          # .github/workflows, and `workflows` is not a grantable scope in a
+          # permissions: block -- only PATs and GitHub Apps can hold it. So keep this
+          # fork's own copies verbatim and let the merge carry everything else. The
+          # push then has an empty net diff for this directory and is allowed.
+          #
+          # Consequence: upstream workflow changes never reach this fork. That is
+          # intended -- every upstream workflow here is disabled at the repo level
+          # anyway (see `gh workflow list --all`).
+          rm -rf "$WORKFLOW_DIR"
+          git add -A "$WORKFLOW_DIR"
+          git checkout "$pre" -- "$WORKFLOW_DIR"
+
+          git commit --no-edit --quiet
+
+          if [ -n "$(git diff --name-only "$pre" HEAD -- "$WORKFLOW_DIR")" ]; then
+            fail workflow-dir-dirty "$(git diff --stat "$pre" HEAD -- "$WORKFLOW_DIR")"
+          fi
+
+          if ! push_log=$(git push origin "HEAD:$GITHUB_REF_NAME" 2>&1); then
+            echo "$push_log"
+            fail push-rejected "$push_log"
+          fi
+
+          echo 'reason=merged' >> "$GITHUB_OUTPUT"
+          git --no-pager log --oneline "$pre..HEAD"
 
       - name: Notify on sync failure
         if: failure() && steps.sync.outputs.reason != ''
@@ -75,52 +122,57 @@ jobs:
               '```',
             ].join('\n');
 
+            const workflowNote = [
+              'Note: a manual merge also brings upstream `.github/workflows/**` changes',
+              'into this fork, which the automated sync deliberately skips. Disable any',
+              'newly arrived workflow with `gh workflow disable <file>`.',
+            ].join('\n');
+
             const details = {
-              'workflow-scope': {
-                title: `Fork sync blocked: upstream changed a workflow file (${date})`,
-                body: [
-                  'The automated fork sync was **not** blocked by a merge conflict.',
-                  '',
-                  'Upstream added or modified a file under `.github/workflows/`, and the',
-                  "Actions `GITHUB_TOKEN` is not permitted to write workflow files. This is a",
-                  'hard GitHub restriction: `workflows` is not an available scope in a',
-                  "workflow's `permissions:` block — only personal access tokens and GitHub",
-                  'Apps can hold it.',
-                  '',
-                  '**Fix now** — merge locally and push with your own credentials:',
-                  '',
-                  manualMerge,
-                  '',
-                  '**Fix permanently** — create a fine-grained PAT scoped to this repository',
-                  'with `Contents: read and write` and `Workflows: read and write`, then add it',
-                  'as a repository secret named `SYNC_TOKEN`. This workflow picks it up',
-                  'automatically.',
-                ].join('\n'),
-              },
               conflict: {
                 title: `Fork sync failed: merge conflict (${date})`,
                 body: [
                   'The automated fork sync hit a genuine merge conflict between this',
-                  "fork's customizations and upstream.",
+                  "fork's customizations and upstream, outside `.github/workflows/**`.",
                   '',
                   '**Action required** — resolve manually:',
                   '',
                   manualMerge,
                   '',
-                  'If the conflict is a delete/modify on a file this fork intentionally',
-                  'removed, prefer keeping the upstream file and disabling the workflow via',
-                  '`gh workflow disable <file>` instead — a deleted file conflicts forever.',
+                  workflowNote,
                 ].join('\n'),
               },
-              unmergeable: {
-                title: `Fork sync failed: branches cannot be merged (${date})`,
+              'merge-failed': {
+                title: `Fork sync failed: merge could not start (${date})`,
                 body: [
-                  'The automated fork sync could not merge upstream into `main` (HTTP 422).',
-                  'This usually means divergent history or a rewritten upstream branch.',
+                  'The automated fork sync could not begin a merge with upstream. This is',
+                  'not a content conflict — it usually means divergent or rewritten',
+                  'history on either side.',
                   '',
                   '**Action required** — inspect and merge manually:',
                   '',
                   manualMerge,
+                ].join('\n'),
+              },
+              'workflow-dir-dirty': {
+                title: `Fork sync failed: workflow files changed unexpectedly (${date})`,
+                body: [
+                  'The sync merged upstream but the resulting commit still altered',
+                  '`.github/workflows/**`, which `GITHUB_TOKEN` may not push. The guard',
+                  'caught this before the push, so nothing was written.',
+                  '',
+                  'This means the restore step in `sync-fork.yml` is broken — it should',
+                  'leave that directory byte-identical to the pre-merge commit.',
+                ].join('\n'),
+              },
+              'push-rejected': {
+                title: `Fork sync failed: push rejected (${date})`,
+                body: [
+                  'The merge succeeded but pushing it was rejected. If the message',
+                  'mentions `workflows` permission, the restore step in `sync-fork.yml`',
+                  'is no longer keeping `.github/workflows/**` unchanged. Otherwise the',
+                  'branch most likely moved while the job was running, and the next',
+                  'scheduled run will pick it up.',
                 ].join('\n'),
               },
             }[reason];
@@ -130,7 +182,7 @@ jobs:
               return;
             }
 
-            const body = `${details.body}\n\n**Error**: ${errorMessage}\n\nWorkflow run: ${runUrl}`;
+            const body = `${details.body}\n\n**Error**:\n\n\`\`\`\n${errorMessage}\n\`\`\`\n\nWorkflow run: ${runUrl}`;
 
             const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
