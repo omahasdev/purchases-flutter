@@ -107,6 +107,8 @@ internal class PaywallFooterView(
             override fun onRestoreError(error: Map<String, Any?>) {
                 methodChannel.invokeMethod("onRestoreError", error)
             }
+
+            override fun onInteraction(event: Map<String, Any>) {}
         })
         nativePaywallFooterView.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
