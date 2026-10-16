@@ -159,6 +159,7 @@ class PurchasesFlutterPlugin {
         case 'trackAdLoaded':
         case 'trackAdRevenue':
         case 'trackAdFailedToLoad':
+        case 'trackAdRewardEarnedUnverified':
         case 'trackRewardedAdPromptShown':
         case 'trackRewardedAdPromptAccepted':
           // No-op on web
@@ -181,6 +182,7 @@ class PurchasesFlutterPlugin {
         case 'redeemWebPurchase':
         case 'generateRewardVerificationToken':
         case 'pollRewardVerification':
+        case 'syncPurchasesForResult':
           throw UnsupportedPlatformException();
 
         default:
