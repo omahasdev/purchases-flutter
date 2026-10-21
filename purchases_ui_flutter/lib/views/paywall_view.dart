@@ -1,9 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/models/customer_info_wrapper.dart';
 import 'package:purchases_flutter/models/offering_wrapper.dart';
@@ -11,8 +8,10 @@ import 'package:purchases_flutter/models/package_wrapper.dart';
 import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
+import '../android_platform_view_mode.dart';
 import '../custom_variable_value.dart';
 import '../purchase_logic.dart';
+import '../src/android_platform_view.dart';
 import 'paywall_view_method_handler.dart';
 import 'paywall_theme_mode.dart';
 
@@ -75,12 +74,19 @@ import 'paywall_theme_mode.dart';
 /// restores when `purchasesAreCompletedBy` is set to `myApp`. When provided,
 /// the paywall will delegate purchase and restore operations to this
 /// implementation instead of using RevenueCat's default flow.
+///
+/// [androidPlatformViewMode] (Optional) The mode used to host this view on
+/// Android. By default, Flutter attempts to use Texture Layer Hybrid
+/// Composition. Hybrid Composition is more expensive, but can work around
+/// platform-view rendering issues on some Android 10 devices. Ignored on iOS
+/// and macOS.
 class PaywallView extends StatelessWidget {
   final Offering? offering;
   final bool? displayCloseButton;
   final Map<String, CustomVariableValue>? customVariables;
   final PaywallThemeMode themeMode;
   final PaywallPurchaseLogic? purchaseLogic;
+  final AndroidPlatformViewMode androidPlatformViewMode;
   final Function(Package rcPackage)? onPurchaseStarted;
   final Function(CustomerInfo customerInfo, StoreTransaction storeTransaction)?
       onPurchaseCompleted;
@@ -100,6 +106,8 @@ class PaywallView extends StatelessWidget {
     this.customVariables,
     this.themeMode = PaywallThemeMode.system,
     this.purchaseLogic,
+    this.androidPlatformViewMode =
+        AndroidPlatformViewMode.textureLayerHybridComposition,
     this.onPurchaseStarted,
     this.onPurchaseCompleted,
     this.onPurchaseCancelled,
@@ -144,27 +152,11 @@ class PaywallView extends StatelessWidget {
   PlatformViewLink _buildAndroidPlatformViewLink(
     Map<String, dynamic> creationParams,
   ) =>
-      PlatformViewLink(
+      buildAndroidPlatformViewLink(
         viewType: _viewType,
-        surfaceFactory: (context, controller) => AndroidViewSurface(
-          controller: controller as AndroidViewController,
-          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
-          hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-        ),
-        onCreatePlatformView: (params) =>
-            PlatformViewsService.initSurfaceAndroidView(
-          id: params.id,
-          viewType: _viewType,
-          layoutDirection: TextDirection.ltr,
-          creationParams: creationParams,
-          creationParamsCodec: const StandardMessageCodec(),
-          onFocus: () {
-            params.onFocusChanged(true);
-          },
-        )
-              ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
-              ..addOnPlatformViewCreatedListener(_buildListenerChannel)
-              ..create(),
+        creationParams: creationParams,
+        mode: androidPlatformViewMode,
+        onPlatformViewCreated: _buildListenerChannel,
       );
 
   void _buildListenerChannel(int id) {
