@@ -5,13 +5,10 @@ import android.content.Intent
 import android.util.Log
 import com.revenuecat.purchases.PurchasesErrorCode
 import com.revenuecat.purchases.PresentedOfferingContext;
-import com.revenuecat.purchases.hybridcommon.ui.CheckpointListener
 import com.revenuecat.purchases.hybridcommon.ui.PaywallResultListener
 import com.revenuecat.purchases.hybridcommon.ui.PaywallSource
 import com.revenuecat.purchases.hybridcommon.ui.PresentPaywallOptions
-import com.revenuecat.purchases.hybridcommon.ui.presentCheckpoint
 import com.revenuecat.purchases.hybridcommon.ui.presentPaywallFromFragment
-import com.revenuecat.purchases.ui.revenuecatui.InviteOnlyCheckpointsAPI
 import com.revenuecat.purchases.ui.revenuecatui.customercenter.ShowCustomerCenter
 import com.revenuecat.purchases.hybridcommon.ui.CustomerCenterListenerWrapper
 import com.revenuecat.purchases.Purchases
@@ -28,7 +25,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
-import java.util.UUID
 
 class PurchasesUiFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
     PluginRegistry.ActivityResultListener {
@@ -39,6 +35,7 @@ class PurchasesUiFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private lateinit var channel : MethodChannel
     private lateinit var binaryMessenger: BinaryMessenger
+    private lateinit var checkpointHandler: CheckpointHandler
 
     private var pendingResult: Result? = null
 
@@ -67,6 +64,7 @@ class PurchasesUiFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "purchases_ui_flutter")
         channel.setMethodCallHandler(this)
         binaryMessenger = flutterPluginBinding.binaryMessenger
+        checkpointHandler = CheckpointHandler(binaryMessenger)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -107,12 +105,7 @@ class PurchasesUiFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
             "presentCustomerCenter" -> presentCustomerCenter(
                 result = result,
             )
-            "checkpoint" -> checkpoint(
-                result = result,
-                identifier = call.argument("identifier"),
-                customVariables = call.argument<Map<String, Any?>>("customVariables"),
-                presentationMode = call.argument("presentationMode"),
-            )
+            "checkpoint" -> checkpointHandler.present(call, result)
             else -> {
                 result.notImplemented()
             }
@@ -120,6 +113,7 @@ class PurchasesUiFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        checkpointHandler.dispose()
         channel.setMethodCallHandler(null)
         clearCustomerCenterListener()
     }
@@ -178,38 +172,6 @@ class PurchasesUiFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
                 null
             )
         }
-    }
-
-    @OptIn(InviteOnlyCheckpointsAPI::class)
-    private fun checkpoint(
-        result: Result,
-        identifier: String?,
-        customVariables: Map<String, Any?>?,
-        presentationMode: String?,
-    ) {
-        if (identifier == null) {
-            result.error("BAD_ARGS", "Missing identifier in checkpoint", null)
-            return
-        }
-        val flutterResult = result
-        // Replies at most once, and only when the checkpoint passes: backing out never invokes the callback.
-        presentCheckpoint(
-            identifier = identifier,
-            callId = UUID.randomUUID().toString(),
-            customVariables = customVariables,
-            presentationMode = presentationMode,
-            useCustomPaywallPresenter = false,
-            hasErrorDialogFactory = false,
-            listener = object : CheckpointListener {
-                override fun onCheckpointPassed(result: Map<String, Any?>) {
-                    flutterResult.success(result)
-                }
-
-                override fun onCheckpointError(code: String, message: String) {
-                    flutterResult.error(code, message, null)
-                }
-            },
-        )
     }
 
     private fun presentCustomerCenter(

@@ -10,6 +10,7 @@ import 'package:purchases_flutter/models/purchases_error.dart';
 import 'package:purchases_flutter/models/store_transaction.dart';
 
 import 'checkpoint.dart';
+import 'checkpoint_method_handler.dart';
 import 'custom_variable_value.dart';
 import 'paywall_presentation_configuration.dart';
 import 'paywall_result.dart';
@@ -223,14 +224,18 @@ class RevenueCatUI {
   /// checkpoint. It is not called when the user backs out, when a blocking
   /// error occurs, or when another checkpoint already owns presentation. Treat
   /// a checkpoint as a callback rather than a pending operation to await. The
-  /// SDK handles error presentation.
+  /// SDK handles error presentation; [CheckpointParams.errorDialogFactory] can
+  /// customize the content, select the default dialog, or suppress it.
   ///
   /// Returns a function that removes the callback. Call it when the owning
   /// screen is disposed; removing the callback does not dismiss a flow that is
-  /// already on screen.
+  /// already on screen. An app-owned paywall must still call its completion
+  /// after dismissal. Pending error requests revert to default dialogs.
   ///
-  /// Requires iOS 15+ or Android, and Purchases to be configured. Throws an
-  /// [UnsupportedError] on other platforms.
+  /// Requires iOS 15+ or Android, and Purchases to be configured. On earlier
+  /// iOS versions the native SDK reports a startup error asynchronously. Flutter
+  /// logs that error and skips [onPassed]. On platforms other than iOS and
+  /// Android, this method throws [UnsupportedError] synchronously.
   ///
   /// **Experimental:** Checkpoints are an invite-only API and may change or be
   /// removed in a future release without a major version bump.
@@ -249,45 +254,17 @@ class RevenueCatUI {
       throw UnsupportedError('Checkpoints require iOS 15+ or Android.');
     }
 
-    // Native never replies when the user backs out, so the future below can stay
-    // pending for the lifetime of the engine. Dropping the callback on removal
-    // keeps that closure from retaining `onPassed` and whatever it captures.
-    CheckpointPassed? callback = onPassed;
-    _methodChannel.invokeMethod<Object?>('checkpoint', {
-      'identifier': identifier,
-      'customVariables': convertCustomVariablesToNative(
-        params.customVariables,
-      ),
-      'presentationMode': params.presentationMode.toString(),
-    }).then<void>((response) {
-      final passed = callback;
-      if (passed == null) return;
-      callback = null;
-      final CheckpointResult result;
-      try {
-        result = CheckpointResult.fromJson(
-          Map<String, dynamic>.from(response as Map),
-        );
-      } catch (e) {
-        debugPrint('RevenueCatUI: Error parsing the checkpoint result: $e');
-        return;
-      }
-      try {
-        passed(result);
-      } catch (error, stack) {
-        FlutterError.reportError(
-          FlutterErrorDetails(
-            exception: error,
-            stack: stack,
-            library: 'purchases_ui_flutter',
-            context: ErrorDescription('while calling a checkpoint callback'),
-          ),
-        );
-      }
-    }).catchError((Object e) {
-      debugPrint('RevenueCatUI: Error presenting checkpoint $identifier: $e');
-    });
-    return () => callback = null;
+    return _checkpointHandler.checkpoint(identifier, onPassed, params);
+  }
+
+  static final _checkpointHandler = CheckpointMethodHandler(_methodChannel);
+
+  /// Sets the default app-owned presenter for future checkpoints. Each call
+  /// captures its presenter. Pass null to restore native presentation.
+  /// A per-call presenter overrides this default; useNativePaywallPresenter
+  /// bypasses both. Requires iOS 15+ or Android when a checkpoint is called.
+  static void setPaywallPresenter(PaywallPresenter? presenter) {
+    _checkpointHandler.paywallPresenter = presenter;
   }
 
   /// Presents the customer center modally using the native SDKs.
